@@ -2,15 +2,17 @@ package main
 
 import (
 	"context"
+	"piped/loadbalancers"
 	"piped/piper"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// simpleProducer(ctx)
 	// broadCastSupervisor(ctx)
+	simpleProducer(ctx)
 	broadCastSupervisorV2(ctx)
+	consumerGroupSupervisor(ctx)
 }
 
 func simpleProducer(ctx context.Context) {
@@ -53,5 +55,22 @@ func broadCastSupervisorV2(ctx context.Context) {
 	}
 
 	supervisor.Run(ctx, piper.Opts{"demand": 10})
+}
 
+func consumerGroupSupervisor(ctx context.Context) {
+	userProducer := piper.NewUserProducer()
+	dispatcher := &piper.UserConsumerGroupDispatcher{
+		Consumers: []piper.UserBroadcastConsumer{
+			&piper.UserIDBroadcastConsumer{},
+			&piper.UserIDBroadcastConsumer{},
+		},
+		Balancer: loadbalancers.NewRoundRobalancer(2),
+	}
+
+	supervisor := &piper.UserConsumerGroupSupervisor{
+		Subscribes: userProducer,
+		Dispatcher: dispatcher,
+	}
+
+	supervisor.Run(ctx, piper.Opts{"demand": 10})
 }
