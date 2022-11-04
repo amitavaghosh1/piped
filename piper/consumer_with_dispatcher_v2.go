@@ -91,23 +91,31 @@ func (bs *UserBroadcastSupervisorV2) Run(ctx context.Context, opts Opts) {
 		defer wg.Done()
 
 		for {
-			for result := range bs.Subscribes.Next(ctx, opts) {
-				if result.Err != nil {
-					fmt.Println("error ", result.Err)
-					return
-				}
-
-				for res := range bs.Dispatcher.Dispatch(ctx, result) {
-					if res.Err != nil {
-						fmt.Println("consumer error ", res.Err)
-						continue
-					}
-				}
+			if err := bs.loop(ctx, opts); err != nil {
+				return
 			}
 		}
 	}()
 
 	wg.Wait()
+}
+
+func (bs *UserBroadcastSupervisorV2) loop(ctx context.Context, opts Opts) error {
+	for result := range bs.Subscribes.Next(ctx, opts) {
+		if result.Err != nil {
+			fmt.Println("error ", result.Err)
+			return result.Err
+		}
+
+		for res := range bs.Dispatcher.Dispatch(ctx, result) {
+			if res.Err != nil {
+				fmt.Println("consumer error ", res.Err)
+				continue
+			}
+		}
+	}
+
+	return nil
 }
 
 type UserConsumerGroupSupervisor struct {
@@ -123,21 +131,29 @@ func (cs *UserConsumerGroupSupervisor) Run(ctx context.Context, opts Opts) {
 		defer wg.Done()
 
 		for {
-			for result := range cs.Subscribes.Next(ctx, opts) {
-				if result.Err != nil {
-					fmt.Println("error ", result.Err)
-					return
-				}
-
-				for res := range cs.Dispatcher.Dispatch(ctx, result) {
-					if res.Err != nil {
-						fmt.Println("consumer error ", res.Err)
-						continue
-					}
-				}
+			if err := cs.loop(ctx, opts); err != nil {
+				return
 			}
 		}
 	}()
 
 	wg.Wait()
+}
+
+func (cs *UserConsumerGroupSupervisor) loop(ctx context.Context, opts Opts) error {
+	for result := range cs.Subscribes.Next(ctx, opts) {
+		if result.Err != nil {
+			fmt.Println("error ", result.Err)
+			return result.Err
+		}
+
+		for res := range cs.Dispatcher.Dispatch(ctx, result) {
+			if res.Err != nil {
+				fmt.Println("consumer error ", res.Err)
+				continue
+			}
+		}
+	}
+
+	return nil
 }
