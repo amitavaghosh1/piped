@@ -1,18 +1,19 @@
-package piper
+package v1
 
 import (
 	"context"
 	"fmt"
+	"piped/piper"
 	"sync"
 )
 
 type UserBroadcastDispatcher struct {
 	Consumers  []UserBroadcastConsumer
-	Subscribes SimpleProducer
+	Subscribes piper.SimpleProducer
 }
 
-func (bd *UserBroadcastDispatcher) Dispatch(ctx context.Context, opts Opts) chan UserResult {
-	res := make(chan UserResult, 1)
+func (bd *UserBroadcastDispatcher) Dispatch(ctx context.Context, opts piper.Opts) chan piper.UserResult {
+	res := make(chan piper.UserResult, 1)
 
 	go func() {
 		for result := range bd.Subscribes.Next(ctx, opts) {
@@ -24,8 +25,8 @@ func (bd *UserBroadcastDispatcher) Dispatch(ctx context.Context, opts Opts) chan
 			}
 
 			for _, consumer := range bd.Consumers {
-				go func(c UserBroadcastConsumer, result UserResult) {
-					res <- UserResult{Data: result.Data, Err: c.Handle(ctx, result)}
+				go func(c UserBroadcastConsumer, result piper.UserResult) {
+					res <- piper.UserResult{Data: result.Data, Err: c.Handle(ctx, result).Err}
 				}(consumer, result)
 			}
 		}
@@ -38,7 +39,7 @@ type UserBroadcastSupervisor struct {
 	Dispatcher *UserBroadcastDispatcher
 }
 
-func (bs *UserBroadcastSupervisor) Run(ctx context.Context, opts Opts) {
+func (bs *UserBroadcastSupervisor) Run(ctx context.Context, opts piper.Opts) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -59,34 +60,34 @@ func (bs *UserBroadcastSupervisor) Run(ctx context.Context, opts Opts) {
 }
 
 type UserBroadcastConsumer interface {
-	Handle(ctx context.Context, result UserResult) error
+	Handle(ctx context.Context, result piper.UserResult) piper.UserResult
 }
 
 type UserIDBroadcastConsumer struct {
 	// In chan UserResult
 }
 
-func (ubc *UserIDBroadcastConsumer) Handle(ctx context.Context, result UserResult) (err error) {
+func (ubc *UserIDBroadcastConsumer) Handle(ctx context.Context, result piper.UserResult) piper.UserResult {
 	// var err = make(chan error, 1)
 
 	// go func(res UserResult) {
 	fmt.Println("id broadcaster ", result.Data.ID)
 	// }(result)
 
-	return err
+	return piper.UserResult{Data: result.Data, Err: nil}
 }
 
 type UserNameBroadcastConsumer struct {
 	// In chan UserResult
 }
 
-func (ubc *UserNameBroadcastConsumer) Handle(ctx context.Context, result UserResult) (err error) {
+func (ubc *UserNameBroadcastConsumer) Handle(ctx context.Context, result piper.UserResult) piper.UserResult {
 	// var err = make(chan error, 1)
 
 	// go func(res UserResult) {
 	fmt.Println("name broadcaster ", result.Data.Name)
 	// }(result)
 
-	return err
+	return piper.UserResult{Data: result.Data, Err: nil}
 
 }

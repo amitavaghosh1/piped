@@ -7,9 +7,26 @@ import (
 	"time"
 )
 
+type Opts map[string]interface{}
+
 type User struct {
-	ID   int
-	Name string
+	ID    int
+	Name  string
+	Kills int
+}
+
+func (u *User) GetRank() string {
+	kills := u.Kills
+
+	if kills < 3 {
+		return "Novice"
+	}
+
+	if kills < 7 {
+		return "Pro"
+	}
+
+	return "Veteran"
 }
 
 type SimpleProducer interface {
@@ -32,27 +49,27 @@ func NewUserProducer() *UserProducer {
 	return &UserProducer{
 		closing: make(chan chan error, 1),
 		store: []User{
-			{ID: 1, Name: "avai"},
-			{ID: 2, Name: "bvai"},
-			{ID: 3, Name: "cvai"},
-			{ID: 4, Name: "dvai"},
-			{ID: 5, Name: "evai"},
-			{ID: 6, Name: "fvai"},
-			{ID: 7, Name: "gvai"},
-			{ID: 8, Name: "hvai"},
-			{ID: 9, Name: "ivai"},
-			{ID: 10, Name: "jvai"},
-			{ID: 11, Name: "kvai"},
-			{ID: 12, Name: "lvai"},
-			{ID: 13, Name: "mvai"},
-			{ID: 14, Name: "nvai"},
-			{ID: 15, Name: "ovai"},
-			{ID: 16, Name: "pvai"},
-			{ID: 17, Name: "qvai"},
-			{ID: 19, Name: "rvai"},
-			{ID: 20, Name: "svai"},
-			{ID: 21, Name: "tvai"},
-			{ID: 22, Name: "uvai"},
+			{ID: 1, Name: "avai", Kills: 0},
+			{ID: 2, Name: "bvai", Kills: 1},
+			{ID: 3, Name: "cvai", Kills: 2},
+			{ID: 4, Name: "dvai", Kills: 3},
+			{ID: 5, Name: "evai", Kills: 4},
+			{ID: 6, Name: "fvai", Kills: 5},
+			{ID: 7, Name: "gvai", Kills: 6},
+			{ID: 8, Name: "hvai", Kills: 7},
+			{ID: 9, Name: "ivai", Kills: 8},
+			{ID: 10, Name: "jvai", Kills: 9},
+			{ID: 11, Name: "kvai", Kills: 0},
+			{ID: 12, Name: "lvai", Kills: 1},
+			{ID: 13, Name: "mvai", Kills: 2},
+			{ID: 14, Name: "nvai", Kills: 3},
+			{ID: 15, Name: "ovai", Kills: 4},
+			{ID: 16, Name: "pvai", Kills: 5},
+			{ID: 17, Name: "qvai", Kills: 6},
+			{ID: 19, Name: "rvai", Kills: 7},
+			{ID: 20, Name: "svai", Kills: 8},
+			{ID: 21, Name: "tvai", Kills: 9},
+			{ID: 22, Name: "uvai", Kills: 20},
 		}}
 }
 

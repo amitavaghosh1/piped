@@ -1,27 +1,26 @@
-package piper
+package v1
 
 import (
 	"context"
 	"fmt"
+	"piped/piper"
 	"sync"
 )
 
-type Opts map[string]interface{}
-
 type UserConsumer interface {
-	Run(ctx context.Context, opts Opts) chan UserResult
+	Run(ctx context.Context, opts piper.Opts) chan piper.UserResult
 }
 
 type UserDetailConsumer struct {
-	subscribes_to SimpleProducer
+	subscribes_to piper.SimpleProducer
 }
 
-func NewUserDetailConsumer(subs SimpleProducer) *UserDetailConsumer {
+func NewUserDetailConsumer(subs piper.SimpleProducer) *UserDetailConsumer {
 	return &UserDetailConsumer{subscribes_to: subs}
 }
 
-func (c *UserDetailConsumer) Run(ctx context.Context, opts Opts) chan UserResult {
-	res := make(chan UserResult, 1)
+func (c *UserDetailConsumer) Run(ctx context.Context, opts piper.Opts) chan piper.UserResult {
+	res := make(chan piper.UserResult, 1)
 
 	go func() {
 		for result := range c.subscribes_to.Next(ctx, opts) {
@@ -42,7 +41,7 @@ type SimpleSupervisor struct {
 	Consumer UserConsumer
 }
 
-func (sv *SimpleSupervisor) Run(ctx context.Context, opts Opts) {
+func (sv *SimpleSupervisor) Run(ctx context.Context, opts piper.Opts) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 

@@ -57,7 +57,7 @@ We have two types of `Dispatcher`
 // Either
 
 type Consumer interface {
-    Handle(ctx context.Context, result Result) error
+    Handle(ctx context.Context, result Result) Result
 }
 
 // Or

@@ -1,22 +1,23 @@
-package piper
+package v1
 
 import (
 	"context"
 	"fmt"
 	"piped/loadbalancers"
+	"piped/piper"
 	"sync"
 )
 
 type UserDispatcherV2 interface {
-	Dispatch(ctx context.Context, result UserResult) chan UserResult
+	Dispatch(ctx context.Context, result piper.UserResult) chan piper.UserResult
 }
 
 type UserBroadcastDispatcherV2 struct {
 	Consumers []UserBroadcastConsumer
 }
 
-func (bd *UserBroadcastDispatcherV2) Dispatch(ctx context.Context, result UserResult) chan UserResult {
-	res := make(chan UserResult, 1)
+func (bd *UserBroadcastDispatcherV2) Dispatch(ctx context.Context, result piper.UserResult) chan piper.UserResult {
+	res := make(chan piper.UserResult, 1)
 
 	go func() {
 		defer close(res)
@@ -41,12 +42,12 @@ func (bd *UserBroadcastDispatcherV2) Dispatch(ctx context.Context, result UserRe
 	return res
 }
 
-func (bd *UserBroadcastDispatcherV2) work(ctx context.Context, w *sync.WaitGroup, consumer UserBroadcastConsumer, result UserResult, res chan UserResult) {
+func (bd *UserBroadcastDispatcherV2) work(ctx context.Context, w *sync.WaitGroup, consumer UserBroadcastConsumer, result piper.UserResult, res chan piper.UserResult) {
 	defer w.Done()
 
-	res <- UserResult{
+	res <- piper.UserResult{
 		Data: result.Data,
-		Err:  consumer.Handle(ctx, result),
+		Err:  consumer.Handle(ctx, result).Err,
 	}
 }
 
@@ -55,8 +56,8 @@ type UserConsumerGroupDispatcher struct {
 	Balancer  loadbalancers.Balancer
 }
 
-func (cd *UserConsumerGroupDispatcher) Dispatch(ctx context.Context, result UserResult) chan UserResult {
-	res := make(chan UserResult, 1)
+func (cd *UserConsumerGroupDispatcher) Dispatch(ctx context.Context, result piper.UserResult) chan piper.UserResult {
+	res := make(chan piper.UserResult, 1)
 
 	go func() {
 		defer close(res)
@@ -71,7 +72,7 @@ func (cd *UserConsumerGroupDispatcher) Dispatch(ctx context.Context, result User
 		fmt.Println("using worker ", idx)
 
 		consumer := cd.Consumers[idx]
-		res <- UserResult{Data: result.Data, Err: consumer.Handle(ctx, result)}
+		res <- piper.UserResult{Data: result.Data, Err: consumer.Handle(ctx, result).Err}
 	}()
 
 	return res
@@ -80,10 +81,10 @@ func (cd *UserConsumerGroupDispatcher) Dispatch(ctx context.Context, result User
 
 type UserBroadcastSupervisorV2 struct {
 	Dispatcher UserDispatcherV2
-	Subscribes SimpleProducer
+	Subscribes piper.SimpleProducer
 }
 
-func (bs *UserBroadcastSupervisorV2) Run(ctx context.Context, opts Opts) {
+func (bs *UserBroadcastSupervisorV2) Run(ctx context.Context, opts piper.Opts) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -100,7 +101,7 @@ func (bs *UserBroadcastSupervisorV2) Run(ctx context.Context, opts Opts) {
 	wg.Wait()
 }
 
-func (bs *UserBroadcastSupervisorV2) loop(ctx context.Context, opts Opts) error {
+func (bs *UserBroadcastSupervisorV2) loop(ctx context.Context, opts piper.Opts) error {
 	for result := range bs.Subscribes.Next(ctx, opts) {
 		if result.Err != nil {
 			fmt.Println("error ", result.Err)
@@ -120,10 +121,10 @@ func (bs *UserBroadcastSupervisorV2) loop(ctx context.Context, opts Opts) error 
 
 type UserConsumerGroupSupervisor struct {
 	Dispatcher UserDispatcherV2
-	Subscribes SimpleProducer
+	Subscribes piper.SimpleProducer
 }
 
-func (cs *UserConsumerGroupSupervisor) Run(ctx context.Context, opts Opts) {
+func (cs *UserConsumerGroupSupervisor) Run(ctx context.Context, opts piper.Opts) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -140,7 +141,7 @@ func (cs *UserConsumerGroupSupervisor) Run(ctx context.Context, opts Opts) {
 	wg.Wait()
 }
 
-func (cs *UserConsumerGroupSupervisor) loop(ctx context.Context, opts Opts) error {
+func (cs *UserConsumerGroupSupervisor) loop(ctx context.Context, opts piper.Opts) error {
 	for result := range cs.Subscribes.Next(ctx, opts) {
 		if result.Err != nil {
 			fmt.Println("error ", result.Err)
