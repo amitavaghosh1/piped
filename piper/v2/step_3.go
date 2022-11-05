@@ -191,7 +191,7 @@ func (s *Step3) Supervisors(ctx context.Context, opts piper.Opts) {
 				if err := c.Handle(ctx, opts); err != nil {
 					logrus.Error(err)
 					stop <- err
-					// killMonger.Stop()
+
 					return
 				}
 			}

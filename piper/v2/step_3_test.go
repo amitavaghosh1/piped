@@ -22,7 +22,6 @@ func BenchmarkStep3WithDemand(b *testing.B) {
 			}
 		})
 	}
-
 }
 
 func BenchmarkStep3WithDemand_MultipleConsumer(b *testing.B) {
