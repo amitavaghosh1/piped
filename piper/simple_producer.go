@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 type Opts map[string]interface{}
@@ -103,15 +101,14 @@ func (p *UserProducer) Next(ctx context.Context, opts Opts) chan UserResult {
 }
 
 func (p *UserProducer) loop(ctx context.Context, demand int) {
-	logrus.Println("producing users")
 	var err error
 
 	sig := make(chan bool, 1)
 	sig <- true
 
-	defer func() {
-		logrus.Println("closing")
-	}()
+	// defer func() {
+	// 	logrus.Println("closing")
+	// }()
 	defer close(p.updates)
 	defer close(sig)
 
@@ -138,7 +135,6 @@ func (p *UserProducer) loop(ctx context.Context, demand int) {
 
 			for _, item := range store {
 				r := item
-				logrus.Println(r)
 				p.updates <- UserResult{Data: &r, Err: nil}
 			}
 		case <-time.After(2 * time.Second):

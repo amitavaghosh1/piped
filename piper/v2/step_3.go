@@ -6,6 +6,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"piped/piper"
 	"sync"
@@ -18,6 +19,7 @@ import (
 
 type Producer[E any] interface {
 	Next(context.Context, piper.Opts) chan Result[E]
+	Stop() error
 }
 
 type UserProducer[E User] struct {
@@ -37,6 +39,10 @@ func NewUserProducer[E User](subscriber *piper.UserProducer, opts piper.Opts) *U
 func (up *UserProducer[E]) Next(ctx context.Context, opts piper.Opts) chan Result[E] {
 	up.once.Do(func() { go up.loop(ctx, opts) })
 	return up.updates
+}
+
+func (up *UserProducer[E]) Stop() error {
+	return nil
 }
 
 func (up *UserProducer[E]) loop(ctx context.Context, opts piper.Opts) {
@@ -61,13 +67,13 @@ func (up *UserProducer[E]) loop(ctx context.Context, opts piper.Opts) {
 
 type KillMonger[E User] struct {
 	Producer Producer[E]
-	updates  chan Result[E]
+	closing  chan chan error
 }
 
 func NewKillerProducerConsumer[E User](producer Producer[E], opts piper.Opts) *KillMonger[E] {
 	return &KillMonger[E]{
 		Producer: producer,
-		updates:  make(chan Result[E], getDemandOrDefault(opts)),
+		closing:  make(chan chan error, 1),
 	}
 }
 
@@ -81,19 +87,42 @@ func (pc *KillMonger[E]) Next(ctx context.Context, opts piper.Opts) chan Result[
 	return ch
 }
 
+func (pc *KillMonger[E]) Stop() error {
+	errch := make(chan error)
+	pc.closing <- errch
+	return <-errch
+}
+
+var ErrAbortOnSignal = errors.New("aborting")
+
 func (pc *KillMonger[E]) loop(ctx context.Context, opts piper.Opts, ch chan Result[E]) {
+	// defer func() {
+	// 	logrus.Println("killmonger closing")
+	// }()
+
 	defer close(ch)
 
-	for res := range pc.Producer.Next(ctx, opts) {
-		if res.Err != nil {
-			ch <- res
-			continue
+	var err error
+
+	for {
+		select {
+		case errch := <-pc.closing:
+			errch <- err
+			ch <- Result[E]{Err: ErrAbortOnSignal}
+			return
+		default:
+			for res := range pc.Producer.Next(ctx, opts) {
+				if res.Err != nil {
+					ch <- res
+					continue
+				}
+
+				var user *piper.User = res.Data
+				user.Kills = user.Kills + (rand.Intn(8) + 4)
+
+				ch <- Result[E]{Data: user, Err: res.Err}
+			}
 		}
-
-		var user *piper.User = res.Data
-		user.Kills = user.Kills + (rand.Intn(8) + 4)
-
-		ch <- Result[E]{Data: user, Err: res.Err}
 	}
 }
 
@@ -111,8 +140,8 @@ func (uc *UserConsumer[E]) Handle(ctx context.Context, opts piper.Opts) error {
 			return result.Err
 		}
 
-		// var user *piper.User = result.Data
-		// fmt.Println(user.Name, "|", user.Kills, "|", user.GetRank())
+		var user *piper.User = result.Data
+		logrus.Println(user.Name, "|", user.Kills, "|", user.GetRank())
 	}
 
 	return nil
@@ -129,7 +158,6 @@ func (s *Step3) Supervisor(ctx context.Context, opts piper.Opts) {
 
 	for {
 		if err := consumer.Handle(ctx, opts); err != nil {
-			// logrus.Error(err)
 			return
 		}
 	}
@@ -147,14 +175,23 @@ func (s *Step3) Supervisors(ctx context.Context, opts piper.Opts) {
 	var wg sync.WaitGroup
 	wg.Add(len(consumers))
 
+	stop := make(chan error, 1)
+	go func() {
+		<-stop
+		for _, consumer := range consumers {
+			consumer.LinksTo.Stop()
+		}
+	}()
+
 	for i, consumer := range consumers {
 		go func(w *sync.WaitGroup, c *UserConsumer[User], idx int) {
 			defer w.Done()
 
 			for {
-				// logrus.Println("waiting ", idx)
 				if err := c.Handle(ctx, opts); err != nil {
 					logrus.Error(err)
+					stop <- err
+					// killMonger.Stop()
 					return
 				}
 			}
