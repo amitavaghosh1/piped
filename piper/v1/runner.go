@@ -6,6 +6,8 @@ import (
 	"piped/piper"
 )
 
+var opts = piper.Opts{"demand": 10}
+
 func Run(ctx context.Context) {
 	simpleProducer(ctx)
 	broadCastSupervisorV2(ctx)
@@ -13,7 +15,7 @@ func Run(ctx context.Context) {
 }
 
 func simpleProducer(ctx context.Context) {
-	userProducer := piper.NewUserProducer()
+	userProducer := piper.NewUserProducer(opts)
 	simpleConsumer := NewUserDetailConsumer(userProducer)
 
 	supervisor := &SimpleSupervisor{Consumer: simpleConsumer}
@@ -22,7 +24,7 @@ func simpleProducer(ctx context.Context) {
 }
 
 func broadCastSupervisor(ctx context.Context) {
-	userProducer := piper.NewUserProducer()
+	userProducer := piper.NewUserProducer(opts)
 	dispatcher := &UserBroadcastDispatcher{
 		Consumers: []UserBroadcastConsumer{
 			&UserIDBroadcastConsumer{},
@@ -38,7 +40,7 @@ func broadCastSupervisor(ctx context.Context) {
 }
 
 func broadCastSupervisorV2(ctx context.Context) {
-	userProducer := piper.NewUserProducer()
+	userProducer := piper.NewUserProducer(opts)
 	dispatcher := &UserBroadcastDispatcherV2{
 		Consumers: []UserBroadcastConsumer{
 			&UserIDBroadcastConsumer{},
@@ -55,7 +57,7 @@ func broadCastSupervisorV2(ctx context.Context) {
 }
 
 func consumerGroupSupervisor(ctx context.Context) {
-	userProducer := piper.NewUserProducer()
+	userProducer := piper.NewUserProducer(opts)
 	dispatcher := &UserConsumerGroupDispatcher{
 		Consumers: []UserBroadcastConsumer{
 			&UserIDBroadcastConsumer{},
@@ -69,5 +71,5 @@ func consumerGroupSupervisor(ctx context.Context) {
 		Dispatcher: dispatcher,
 	}
 
-	supervisor.Run(ctx, piper.Opts{"demand": 10})
+	supervisor.Run(ctx, opts)
 }

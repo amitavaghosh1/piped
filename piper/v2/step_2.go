@@ -4,7 +4,6 @@ package v2
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"piped/piper"
 
@@ -20,7 +19,7 @@ func NewStep2[E User](subscriber *piper.UserProducer) *Step2[E] {
 }
 
 func (s *Step2[E]) producer(ctx context.Context, opts piper.Opts) chan Result[E] {
-	ch := make(chan Result[E], 1)
+	ch := make(chan Result[E], getDemandOrDefault(opts))
 
 	go func() {
 		defer close(ch)
@@ -40,7 +39,7 @@ func (s *Step2[E]) producer(ctx context.Context, opts piper.Opts) chan Result[E]
 }
 
 func (s *Step2[E]) killGenerator(ctx context.Context, opts piper.Opts, in chan Result[E]) chan Result[E] {
-	ch := make(chan Result[E], 1)
+	ch := make(chan Result[E], getDemandOrDefault(opts))
 
 	go func() {
 		defer close(ch)
@@ -68,8 +67,8 @@ func (s *Step2[E]) consumer(ctx context.Context, in chan Result[E]) error {
 			return result.Err
 		}
 
-		var user *piper.User = result.Data
-		fmt.Println(user.Name, "|", user.Kills, "|", user.GetRank())
+		// var user *piper.User = result.Data
+		// fmt.Println(user.Name, "|", user.Kills, "|", user.GetRank())
 	}
 
 	return nil

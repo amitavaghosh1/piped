@@ -6,9 +6,9 @@ package v2
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"piped/piper"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -22,28 +22,36 @@ type Producer[E any] interface {
 
 type UserProducer[E User] struct {
 	subscriber *piper.UserProducer
+	once       *sync.Once
+	updates    chan Result[E]
 }
 
-func NewUserProducer[E User](subscriber *piper.UserProducer) *UserProducer[E] {
-	return &UserProducer[E]{subscriber: subscriber}
+func NewUserProducer[E User](subscriber *piper.UserProducer, opts piper.Opts) *UserProducer[E] {
+	return &UserProducer[E]{
+		subscriber: subscriber,
+		once:       &sync.Once{},
+		updates:    make(chan Result[E], getDemandOrDefault(opts)),
+	}
 }
 
 func (up *UserProducer[E]) Next(ctx context.Context, opts piper.Opts) chan Result[E] {
-	ch := make(chan Result[E], getDemandOrDefault(opts))
+	up.once.Do(func() { go up.loop(ctx, opts) })
+	return up.updates
+}
 
-	go func() {
-		defer close(ch)
+func (up *UserProducer[E]) loop(ctx context.Context, opts piper.Opts) {
+	// defer func() {
+	// 	logrus.Println("up closing")
+	// }()
+	defer close(up.updates)
 
-		for res := range up.subscriber.Next(ctx, opts) {
-			ch <- Result[E]{Data: res.Data, Err: res.Err}
+	for res := range up.subscriber.Next(ctx, opts) {
+		up.updates <- Result[E]{Data: res.Data, Err: res.Err}
 
-			if res.Err != nil {
-				return
-			}
+		if res.Err != nil {
+			return
 		}
-	}()
-
-	return ch
+	}
 }
 
 // Behaves much like a producer
@@ -53,32 +61,40 @@ func (up *UserProducer[E]) Next(ctx context.Context, opts piper.Opts) chan Resul
 
 type KillMonger[E User] struct {
 	Producer Producer[E]
+	updates  chan Result[E]
 }
 
-func NewKillerProducerConsumer[E User](producer Producer[E]) *KillMonger[E] {
-	return &KillMonger[E]{Producer: producer}
+func NewKillerProducerConsumer[E User](producer Producer[E], opts piper.Opts) *KillMonger[E] {
+	return &KillMonger[E]{
+		Producer: producer,
+		updates:  make(chan Result[E], getDemandOrDefault(opts)),
+	}
 }
 
 func (pc *KillMonger[E]) Next(ctx context.Context, opts piper.Opts) chan Result[E] {
+	// go pc.loop(ctx, opts, pc.updates)
+	// return pc.updates
+
 	ch := make(chan Result[E], getDemandOrDefault(opts))
-
-	go func(ctx context.Context, o piper.Opts) {
-		defer close(ch)
-
-		for res := range pc.Producer.Next(ctx, opts) {
-			if res.Err != nil {
-				ch <- res
-				continue
-			}
-
-			var user *piper.User = res.Data
-			user.Kills = user.Kills + (rand.Intn(8) + 4)
-
-			ch <- Result[E]{Data: user, Err: res.Err}
-		}
-	}(ctx, opts)
+	go pc.loop(ctx, opts, ch)
 
 	return ch
+}
+
+func (pc *KillMonger[E]) loop(ctx context.Context, opts piper.Opts, ch chan Result[E]) {
+	defer close(ch)
+
+	for res := range pc.Producer.Next(ctx, opts) {
+		if res.Err != nil {
+			ch <- res
+			continue
+		}
+
+		var user *piper.User = res.Data
+		user.Kills = user.Kills + (rand.Intn(8) + 4)
+
+		ch <- Result[E]{Data: user, Err: res.Err}
+	}
 }
 
 type Consumer[E any] interface {
@@ -95,8 +111,8 @@ func (uc *UserConsumer[E]) Handle(ctx context.Context, opts piper.Opts) error {
 			return result.Err
 		}
 
-		var user *piper.User = result.Data
-		fmt.Println(user.Name, "|", user.Kills, "|", user.GetRank())
+		// var user *piper.User = result.Data
+		// fmt.Println(user.Name, "|", user.Kills, "|", user.GetRank())
 	}
 
 	return nil
@@ -106,17 +122,46 @@ type Step3 struct {
 }
 
 func (s *Step3) Supervisor(ctx context.Context, opts piper.Opts) {
-	userProducer := NewUserProducer(piper.NewUserProducer())
-	killMonger := NewKillerProducerConsumer[User](userProducer)
+	userProducer := NewUserProducer(piper.NewUserProducer(opts), opts)
+	killMonger := NewKillerProducerConsumer[User](userProducer, opts)
 
 	consumer := &UserConsumer[User]{LinksTo: killMonger}
 
 	for {
 		if err := consumer.Handle(ctx, opts); err != nil {
-			logrus.Error(err)
+			// logrus.Error(err)
 			return
 		}
 	}
+}
+
+func (s *Step3) Supervisors(ctx context.Context, opts piper.Opts) {
+	userProducer := NewUserProducer(piper.NewUserProducer(opts), opts)
+	killMonger := NewKillerProducerConsumer[User](userProducer, opts)
+
+	consumers := []*UserConsumer[User]{
+		{LinksTo: killMonger},
+		{LinksTo: killMonger},
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(consumers))
+
+	for i, consumer := range consumers {
+		go func(w *sync.WaitGroup, c *UserConsumer[User], idx int) {
+			defer w.Done()
+
+			for {
+				// logrus.Println("waiting ", idx)
+				if err := c.Handle(ctx, opts); err != nil {
+					logrus.Error(err)
+					return
+				}
+			}
+		}(&wg, consumer, i)
+	}
+
+	wg.Wait()
 }
 
 func getDemandOrDefault(opts piper.Opts) int {
@@ -125,6 +170,5 @@ func getDemandOrDefault(opts piper.Opts) int {
 		return 1
 	}
 
-	// demand = 1 // for now
 	return demand
 }

@@ -1,0 +1,44 @@
+go test -cpu 1,2,4,8,16 -benchmem -run=^$ -bench . piped/piper/v2
+cpu: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
+
+---
+Producer Limit = 1, Consumer Demand = 1,10,20
+
+BenchmarkStep3WithDemand/with_demand:_1_                       1        22010960540 ns/op           9056 B/op        124 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-2                     1        22007554095 ns/op           9048 B/op        122 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-4                     1        22007633497 ns/op           7768 B/op        118 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-8                     1        22007833624 ns/op           8992 B/op        119 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-16                    1        22007005269 ns/op           8992 B/op        119 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_                      1        4001303088 ns/op            4000 B/op         56 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-2                    1        4001069072 ns/op            4576 B/op         62 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-4                    1        4000501000 ns/op            4000 B/op         56 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-8                    1        4001334223 ns/op            5824 B/op         65 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-16                   1        4000473842 ns/op            4000 B/op         56 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_                      1        2000243102 ns/op            4112 B/op         51 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-2                    1        2000133688 ns/op            5928 B/op         61 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-4                    1        2000154037 ns/op            4112 B/op         51 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-8                    1        2000199752 ns/op            4112 B/op         51 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-16                   1        2000179615 ns/op            5392 B/op         57 allocs/op
+PASS
+ok      piped/piper/v2  141.240s
+
+---
+Producer Limit = 1,10,20 Consumer Demand = 1,10,20
+
+BenchmarkStep3WithDemand/with_demand:_1_                       1        4001660856 ns/op            5424 B/op         68 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-2                     1        4000349083 ns/op            3776 B/op         59 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-4                     1        4000928619 ns/op            3616 B/op         58 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-8                     1        4000863219 ns/op            3600 B/op         57 allocs/op
+BenchmarkStep3WithDemand/with_demand:_1_-16                    1        4001103330 ns/op            5120 B/op         63 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_                      1        4001296663 ns/op            4000 B/op         56 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-2                    1        4001386060 ns/op            4608 B/op         63 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-4                    1        4001258558 ns/op            5640 B/op         64 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-8                    1        4001341744 ns/op            5520 B/op         65 allocs/op
+BenchmarkStep3WithDemand/with_demand:_10_-16                   1        4001238225 ns/op            5856 B/op         66 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_                      1        4001189748 ns/op            6112 B/op         63 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-2                    1        4000827422 ns/op            5056 B/op         62 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-4                    1        4000811334 ns/op            4504 B/op         58 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-8                    1        4001239028 ns/op            5184 B/op         60 allocs/op
+BenchmarkStep3WithDemand/with_demand:_20_-16                   1        4001266123 ns/op            6304 B/op         65 allocs/op
+PASS
+ok      piped/piper/v2  60.917s

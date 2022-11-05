@@ -15,5 +15,5 @@ func Run(ctx context.Context) {
 	// s2.supervisor(ctx, opts)
 
 	s3 := &Step3{}
-	s3.Supervisor(ctx, opts)
+	s3.Supervisors(ctx, opts)
 }

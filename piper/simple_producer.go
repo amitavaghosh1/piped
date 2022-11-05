@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Opts map[string]interface{}
@@ -37,6 +40,8 @@ type SimpleProducer interface {
 type UserProducer struct {
 	store   []User
 	closing chan chan error
+	once    *sync.Once
+	updates chan UserResult
 }
 
 type UserResult struct {
@@ -44,10 +49,14 @@ type UserResult struct {
 	Err  error
 }
 
+var ErrNoRecords = errors.New("no records")
+
 // New, only used for initialization
-func NewUserProducer() *UserProducer {
+func NewUserProducer(opts Opts) *UserProducer {
 	return &UserProducer{
 		closing: make(chan chan error, 1),
+		once:    &sync.Once{},
+		updates: make(chan UserResult, opts["demand"].(int)),
 		store: []User{
 			{ID: 1, Name: "avai", Kills: 0},
 			{ID: 2, Name: "bvai", Kills: 1},
@@ -83,55 +92,57 @@ func (p *UserProducer) Stop() error {
 }
 
 func (p *UserProducer) Next(ctx context.Context, opts Opts) chan UserResult {
-	fmt.Println("invoked")
+	demand := opts["demand"].(int)
+	// for testing buffer channel overflow
+	// demand = demand + 5
 
-	res := make(chan UserResult, 1)
+	// we need only one instance of producer rn to avoid
+	// state mantainance across multiple consumers
+	p.once.Do(func() { go p.loop(ctx, demand) })
+	return p.updates
+}
 
-	demand, ok := opts["demand"].(int)
-	if !ok {
-		demand = 1
-	}
-
+func (p *UserProducer) loop(ctx context.Context, demand int) {
+	logrus.Println("producing users")
 	var err error
 
-	go func() {
-		sig := make(chan bool, 1)
-		sig <- true
+	sig := make(chan bool, 1)
+	sig <- true
 
-		defer close(sig)
-
-		for {
-			select {
-			case errch := <-p.closing:
-				errch <- err
-				close(res)
-				return
-			case <-sig:
-				var store []User
-
-				if demand > len(p.store)-1 {
-					store = p.store
-				} else {
-					store = p.store[:demand+1]
-				}
-
-				if demand > len(store) {
-					res <- UserResult{Err: errors.New("no records")}
-					close(res)
-					return
-				}
-
-				p.store = p.store[len(store):]
-
-				for _, item := range store {
-					r := item
-					res <- UserResult{Data: &r, Err: nil}
-				}
-			case <-time.After(2 * time.Second):
-				sig <- true
-			}
-		}
+	defer func() {
+		logrus.Println("closing")
 	}()
+	defer close(p.updates)
+	defer close(sig)
 
-	return res
+	for {
+		select {
+		case errch := <-p.closing:
+			errch <- err
+			return
+		case <-sig:
+			var store []User
+
+			if demand > len(p.store)-1 {
+				store = p.store
+			} else {
+				store = p.store[:demand+1]
+			}
+
+			if len(store) == 0 {
+				p.updates <- UserResult{Err: ErrNoRecords}
+				return
+			}
+
+			p.store = p.store[len(store):]
+
+			for _, item := range store {
+				r := item
+				logrus.Println(r)
+				p.updates <- UserResult{Data: &r, Err: nil}
+			}
+		case <-time.After(2 * time.Second):
+			sig <- true
+		}
+	}
 }
